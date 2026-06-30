@@ -615,7 +615,7 @@ def evaluate_rag(questions: list[str], ground_truths: list[str] | None = None) -
     try:
         from datasets import Dataset
         from ragas import evaluate
-        from ragas.metrics.collections import answer_relevancy, context_precision, faithfulness
+        from ragas.metrics import AnswerRelevancy, ContextPrecision, Faithfulness
         from langchain_huggingface import HuggingFaceEmbeddings
     except ImportError as e:
         import traceback
@@ -636,9 +636,11 @@ def evaluate_rag(questions: list[str], ground_truths: list[str] | None = None) -
         )
 
     dataset = Dataset.from_dict(data)
-    metrics = [answer_relevancy, faithfulness]
+    # FIX — import from ragas.metrics (not the non-existent ragas.metrics.collections)
+    # and pass freshly instantiated metric objects, not class references.
+    metrics = [AnswerRelevancy(), Faithfulness()]
     if ground_truths and len(ground_truths) == len(questions):
-        metrics.append(context_precision)
+        metrics.append(ContextPrecision())
 
     results = evaluate(dataset, metrics=metrics, llm=llm, embeddings=ragas_emb)
     return dict(results)
@@ -648,7 +650,7 @@ def evaluate_single_response(question: str, answer: str, contexts: list[str]) ->
     try:
         from datasets import Dataset
         from ragas import evaluate
-        from ragas.metrics.collections import answer_relevancy, faithfulness
+        from ragas.metrics import AnswerRelevancy, Faithfulness
         from langchain_huggingface import HuggingFaceEmbeddings
     except ImportError as e:
         import traceback
@@ -658,8 +660,8 @@ def evaluate_single_response(question: str, answer: str, contexts: list[str]) ->
     ragas_emb = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
     data = {"question": [question], "answer": [answer], "contexts": [contexts]}
     dataset = Dataset.from_dict(data)
-    
-    results = evaluate(dataset, metrics=[answer_relevancy, faithfulness], llm=llm, embeddings=ragas_emb)
+    # FIX — instantiate metric objects with () instead of passing class references.
+    results = evaluate(dataset, metrics=[AnswerRelevancy(), Faithfulness()], llm=llm, embeddings=ragas_emb)
     return dict(results)
 
 # ─── FASTAPI ─────────────────────────────────────────────────
