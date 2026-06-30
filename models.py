@@ -14,10 +14,16 @@ class Document(BaseModel):
 
 
 class Chunk(BaseModel):
-    """A single processed chunk ready for embedding."""
+    """A single processed chunk ready for embedding.
+
+    `source` is kept as a top-level field (matching mini_rag.py) so that
+    every layer (retriever, graph, API) can access it without digging into
+    `metadata`. It is also stored in `metadata["source"]` for backward compat.
+    """
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    doc_id: str
+    doc_id: str = ""                   # parent document id (empty for manual ingest)
     content: str
+    source: str = ""                   # filename / URL — top-level for easy access
     chunk_type: str = "text"           # text | table | heading | code
     heading: Optional[str] = None      # nearest parent heading
     summary: Optional[str] = None      # LLM-generated summary
@@ -49,4 +55,7 @@ class QueryResponse(BaseModel):
     answer: str
     sources: list[dict]
     session_id: str
+    rewritten_query: str = ""
+    timings: dict = {}
     faithfulness_score: Optional[float] = None
+    answer_relevancy_score: Optional[float] = None
