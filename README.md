@@ -7,10 +7,10 @@ End-to-end RAG pipeline with smart chunking, hybrid retrieval, re-ranking, agent
 | Layer | Tech |
 |---|---|
 | Embedding | BGE-M3 (sentence-transformers) |
-| Vector store | FAISS (swap to Qdrant for production) |
+| Vector store | Qdrant (Persistent local storage) |
 | Sparse search | BM25 (rank-bm25) |
 | Re-ranker | cross-encoder/ms-marco-MiniLM-L-6-v2 |
-| LLM | Groq (llama3-70b, free tier) |
+| LLM | Ollama (llama3.2:3b for generation, qwen2.5:0.5b for metadata) |
 | Orchestration | LangGraph |
 | Evaluation | RAGAS |
 | API | FastAPI + SSE streaming |
@@ -92,18 +92,13 @@ rag_system/
 
 ## Retrieval Flow
 
-```
+```text
 User query
-  → Input guardrails
-  → Query rewriting (paraphrase + HyDE + entity expansion)
-  → Hybrid retrieval (dense FAISS + sparse BM25, RRF fusion)
-  → Cross-encoder re-ranking (top-50 → top-8)
-  → Context compression (strip irrelevant sentences)
-  → LangGraph planner (route: simple / multi_hop / out_of_scope)
-  → LLM generation with conversation memory
-  → Output guardrails
-  → Streaming response
-  → RAGAS evaluation (async)
+  → Parallel Query Rewriting (if history exists) & Dense Embedding Prefetch
+  → Hybrid Retrieval (Dense Qdrant + Sparse BM25, RRF fusion)
+  → Cross-encoder Re-ranking (top-25 → top-5)
+  → LLM Generation (llama3.2:3b) with bounded conversation memory
+  → True Token Streaming Response (SSE)
 ```
 
 ## Extending
