@@ -1,0 +1,49 @@
+# Core
+fastapi>=0.111.0
+uvicorn[standard]==0.30.1
+python-dotenv==1.0.1
+pydantic==2.7.4
+
+# Embeddings & Vector Store
+sentence-transformers==3.0.1
+qdrant-client
+numpy==1.26.4
+
+# Sparse retrieval
+rank-bm25==0.2.2
+
+# Re-ranking
+# uses sentence-transformers cross-encoder (already included above)
+
+# LangGraph + LangChain
+langgraph==0.1.19
+langchain==0.2.6
+langchain-community==0.2.6
+langchain-groq==0.1.6
+
+# Evaluation
+ragas==0.1.13
+datasets==2.20.0
+langchain-huggingface
+
+# Guardrails
+guardrails-ai>=0.5.0
+
+# Streaming
+sse-starlette==2.1.0
+
+# Database
+supabase==2.5.0
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.31
+
+# Utilities
+tiktoken==0.7.0
+httpx==0.27.0
+gradio
+
+
+# Evaluation
+ragas==0.1.13
+datasets==2.20.0
+langchain-huggingface

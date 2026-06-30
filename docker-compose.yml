@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  rag-api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - FAISS_INDEX_PATH=/app/storage/faiss.index
+      - BM25_INDEX_PATH=/app/storage/bm25.pkl
+    volumes:
+      - ./storage:/app/storage
+      - ./documents:/app/documents
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: raguser
+      POSTGRES_PASSWORD: ragpass
+      POSTGRES_DB: ragdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

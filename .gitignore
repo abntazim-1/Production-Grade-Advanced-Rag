@@ -1,0 +1,10 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+! .env.example
+qdrant_db/
+*.log
+.DS_Store
