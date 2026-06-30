@@ -1,13 +1,13 @@
 """
-Query rewriting.
-Produces 3 query variants before retrieval:
-  1. Cleaned paraphrase
-  2. HyDE — hypothetical document embedding (what would the answer look like?)
-  3. Entity-expanded version
-Each variant is embedded and retrieved separately; results are merged.
+Query rewriting — port from mini_rag.py.
+
+Uses the fast metadata_model (llama-3.1-8b-instant) for rewriting,
+not the heavy main LLM — matches mini_rag.py's rewrite_query() exactly.
+
+On first-turn queries (no history) rewriting is skipped entirely.
 """
 from langchain_groq import ChatGroq
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 from config import get_settings
 
 settings = get_settings()
@@ -15,43 +15,31 @@ settings = get_settings()
 
 class QueryRewriter:
     def __init__(self):
+        # Use the fast metadata model — matches mini_rag.py
         self.llm = ChatGroq(
-            groq_api_key=settings.groq_api_key,
-            model_name=settings.llm_model,
-            temperature=0.3,
+            model=settings.metadata_model,
+            temperature=0,
+            max_tokens=settings.metadata_max_tokens,
         )
 
-    def rewrite(self, query: str) -> dict[str, str]:
+    def rewrite(self, query: str, history: str = "") -> str:
         """
-        Returns dict with keys: 'original', 'paraphrase', 'hyde', 'expanded'
-        Falls back to original on any error.
+        Rewrites query into a standalone, search-optimized form.
+
+        - If history is empty → returns query as-is (no LLM call).
+        - Mirrors rewrite_query() in mini_rag.py exactly.
         """
-        prompt = f"""Given this user query, produce 3 variants. Respond ONLY in this exact format:
+        if not history.strip():
+            return query
 
-PARAPHRASE: <reworded version, same meaning>
-HYDE: <a short hypothetical passage that would answer this query, 2-3 sentences>
-EXPANDED: <query with relevant entities and synonyms added>
-
-Query: {query}"""
-
-        variants = {
-            "original": query,
-            "paraphrase": query,
-            "hyde": query,
-            "expanded": query,
-        }
-
+        prompt = (
+            "Given the chat history and the latest user query, rewrite the query to be "
+            "a standalone, search-optimized query. If it is already optimal, return it as is. "
+            "ONLY output the rewritten query.\n\n"
+            f"History:\n{history}\n\nQuery: {query}\n\nRewritten:"
+        )
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
-            text = response.content.strip()
-            for key in ["paraphrase", "hyde", "expanded"]:
-                tag = key.upper() + ":"
-                if tag in text:
-                    after = text.split(tag, 1)[1]
-                    value = after.split("\n")[0].strip()
-                    if value:
-                        variants[key] = value
+            return self.llm.invoke([HumanMessage(content=prompt)]).content.strip()
         except Exception as e:
             print(f"[QueryRewriter] Error: {e} — using original query")
-
-        return variants
+            return query
