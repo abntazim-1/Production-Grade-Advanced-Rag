@@ -611,20 +611,38 @@ def run(query: str, session_id: str = "default") -> dict:
     }
 
 # ─── EVALUATION (RAGAS) ────────────────────────────────────────────────────────────
+# RAGAS needs its LLM wrapped in LangchainLLMWrapper (v0.1.x API requirement).
+# We use qwen2.5:0.5b (already pulled) with format="json" so Ollama forces clean
+# JSON output — prevents the verbose preamble that breaks RAGAS's output parser
+# and causes scores to silently return 0.
+from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from langchain_huggingface import HuggingFaceEmbeddings as _HFEmb
+
+_ragas_ollama = ChatOllama(
+    model=METADATA_MODEL,   # qwen2.5:0.5b — reliable JSON output, fast
+    temperature=0,
+    format="json",          # Ollama native JSON mode — strips all preamble text
+    num_predict=1024,
+    num_ctx=2048,
+    num_gpu=-1,
+    keep_alive=-1,
+)
+_ragas_llm = LangchainLLMWrapper(_ragas_ollama)
+_ragas_emb = LangchainEmbeddingsWrapper(_HFEmb(model_name=EMBED_MODEL))
+
+
 def evaluate_rag(questions: list[str], ground_truths: list[str] | None = None) -> dict:
     try:
         from datasets import Dataset
         from ragas import evaluate
         from ragas.metrics import AnswerRelevancy, ContextPrecision, Faithfulness
-        from langchain_huggingface import HuggingFaceEmbeddings
     except ImportError as e:
         import traceback
         traceback.print_exc()
         return {"error": f"Import error: {e}"}
 
     print(f"Evaluating {len(questions)} queries with RAGAS...")
-    ragas_emb = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-
     data: dict[str, list] = {"question": [], "answer": [], "contexts": [], "ground_truth": []}
     for i, q in enumerate(questions):
         res = run(q, session_id=f"eval_{uuid.uuid4()}")
@@ -636,14 +654,13 @@ def evaluate_rag(questions: list[str], ground_truths: list[str] | None = None) -
         )
 
     dataset = Dataset.from_dict(data)
-    # FIX — import from ragas.metrics (not the non-existent ragas.metrics.collections)
-    # and pass freshly instantiated metric objects, not class references.
     metrics = [AnswerRelevancy(), Faithfulness()]
     if ground_truths and len(ground_truths) == len(questions):
         metrics.append(ContextPrecision())
 
-    results = evaluate(dataset, metrics=metrics, llm=llm, embeddings=ragas_emb)
+    results = evaluate(dataset, metrics=metrics, llm=_ragas_llm, embeddings=_ragas_emb)
     return dict(results)
+
 
 def evaluate_single_response(question: str, answer: str, contexts: list[str]) -> dict:
     """Evaluates a single chat turn without re-running the retrieval pipeline."""
@@ -651,17 +668,14 @@ def evaluate_single_response(question: str, answer: str, contexts: list[str]) ->
         from datasets import Dataset
         from ragas import evaluate
         from ragas.metrics import AnswerRelevancy, Faithfulness
-        from langchain_huggingface import HuggingFaceEmbeddings
     except ImportError as e:
         import traceback
         traceback.print_exc()
         return {"error": f"Import error: {e}"}
 
-    ragas_emb = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
     data = {"question": [question], "answer": [answer], "contexts": [contexts]}
     dataset = Dataset.from_dict(data)
-    # FIX — instantiate metric objects with () instead of passing class references.
-    results = evaluate(dataset, metrics=[AnswerRelevancy(), Faithfulness()], llm=llm, embeddings=ragas_emb)
+    results = evaluate(dataset, metrics=[AnswerRelevancy(), Faithfulness()], llm=_ragas_llm, embeddings=_ragas_emb)
     return dict(results)
 
 # ─── FASTAPI ─────────────────────────────────────────────────
